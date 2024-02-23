@@ -1,0 +1,9 @@
+alarmtest
+
+- 时钟中断发生时，正在执行的代码trap进入kernel，通常寄存器信息被保存在trapframe，在kernel中执行相应处理代码之后，再通过trapframe恢复寄存器，最终回到user space，然后在引起trap的下一行继续执行
+- 但是我们要实现用户层面的time interrupt，也就是说，我们在回到user space的时候不能去到引起trap的下一行，我们需要跳转到相应的回调函数，也就是handler
+- 于是我们在kernel处理相关代码之后，我们将trapframe中寄存器信息保存在alarmframe里面，也就是说我们现在的alarmframe里存了最初发生时钟中断时的寄存器信息。然后我们将epc修改为handler地址，这样当我们从trap返回时，就会执行handler代码
+- 但是还有一个问题，就是当执行完handler代码的时候，我们怎么回到最开始发生时钟中断时的代码继续执行呢。我们可以在handler代码中设置一个系统调用，重新trap进入kernel，然后执行系统调用的时候，将我们alarmframe复制给trapframe，这样最初的寄存器信息就被恢复到trapframe中了。需要注意的是，当sigreturn返回的时候，会把返回值写给trapframe中的a0，因此我们需要返回trapframe的a0。
+- 然后trap返回之后，我们会回到最初发生时钟中断的代码处并继续执行
+- 另外需要注意的是，handler不能被多次调用。这是说，当我们第一次触发时钟中断时，我们会调用handler，但是如果handler处理时间很长，这时候又发生了第二次时钟中断，我们不应该再次调用handler。不然当我们第一个handler返回之后，我们的代码继续往下执行，但是当第二个handler返回，我们的代码又回到第一次中断发生的地方开始执行了。
+
